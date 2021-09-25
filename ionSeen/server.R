@@ -1,7 +1,7 @@
 library(shiny)
 
 # 加载过程中需要依赖的软件包
-library(dplyr)
+library(dplyr, warn.conflicts = FALSE)
 library(stringr)
 library(ggplot2)
 library(pheatmap)
@@ -9,9 +9,26 @@ library(reshape2)
 library(agricolae)
 options(stringsAsFactors = FALSE)
 
-shinyServer(function(input, output){
-  output$panel <- renderText({
-    paste("Current selection: ", input$plot)
+# some useful functions
+## 将读取文件的过程分离出来
+load_file <- function(name, path){
+  ext <- tools::file_ext(name)
+  switch(ext,
+         csv = read.csv(path, sep = ","),
+         tsv = read.csv(path, sep = "\t"),
+         validate("Invalid file; Please upload a .csv or .tsv file"))
+}
+
+## main server ####
+shinyServer(function(input, output, session){
+  # 根据Panel选择自动切换页面
+  observeEvent(input$tabsetSide, {
+    updateTabsetPanel(session, "tabsetMain",
+                      selected = input$tabsetSide)
+  })
+  observeEvent(input$tabsetMain, {
+    updateTabsetPanel(session, "tabsetSide",
+                      selected = input$tabsetMain)
   })
   # 上传文件并读取数据
   getIonInput <- reactive({
@@ -19,8 +36,8 @@ shinyServer(function(input, output){
     # 需要保证sampleTable中的顺序与测离子计算结果中的顺序对应好
     req(input$upload_ion)
     req(input$upload_table)
-    icpppm <- read.csv(input$upload_ion$datapath)
-    sampleTable <- read.csv(input$upload_table$datapath)
+    icpppm <- load_file(input$upload_ion$name, input$upload_ion$datapath)
+    sampleTable <- load_file(input$upload_table$name, input$upload_table$datapath)
     # 将第一列改变为sample名称
     icpppm[,1] <- sampleTable[,2]
     # 修改元素列名称
@@ -74,11 +91,15 @@ shinyServer(function(input, output){
     return(head(icpppm))
   })
   
-  # create selection for Ion
+  # create selection for Ion1
   output$elementSelector <- renderUI({
     icpppm <- getIonInput()
     ionList <- colnames(icpppm)[-1]
     checkboxGroupInput("element", "Choose the element:",selected = ionList[1], as.list(ionList))
+  })
+  # adapt for reset
+  observeEvent(input$resetION1,{
+    updateCheckboxGroupInput(inputId = "element", value = ionList[1])
   })
   
   # choose sample ID to analysis
