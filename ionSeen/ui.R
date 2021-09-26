@@ -23,11 +23,13 @@ shinyUI(
                    # upload files
                    fileInput("upload_ion", "Upload Ion Result"),
                    fileInput("upload_table", "Upload Sample Table"),
+                   #inputDataPanelUI("dataIn"),
                    # select plot type
                    radioButtons('plot', 'General View',
                                 c(Heatmap='heatmap',
                                   PCA='pca'),
                                 'heatmap'),
+                   #generalViewPanelUI("GV")
                    #fluidRow(column(6, "Fuild6"), column(6, "Fluid 6-2"))
           ),
           ## 侧边栏第二页####
@@ -37,9 +39,11 @@ shinyUI(
                    # 选择元素进行分析
                    uiOutput("elementSelector"),
                    # 添加重置按钮1
-                   #actionButton("resetION1", "Reset"),
+                   actionButton("resetION1", "Reset"),
                    # 选择分析的样本
                    uiOutput("idSelector"),
+                   # 添加重置ID按钮1
+                   actionButton("resetID1", "Reset"),
                    # 选择是否去除异常值，默认不去除
                    checkboxInput.outRemover(),
                    sliderInput.outCoef(),
@@ -52,6 +56,8 @@ shinyUI(
                    uiOutput("singleElementSelector"),
                    # 选择样本
                    uiOutput("idSelector2"),
+                   # 添加重置ID按钮2
+                   actionButton("resetID2", "Reset"),
                    # 选择是否去除异常值，默认不去除
                    checkboxInput.outRemover(),
                    sliderInput.outCoef(),
@@ -64,11 +70,13 @@ shinyUI(
         tabsetPanel(
           id = "tabsetMain",
           tabPanel("Input Data Viewer",
-                   tableOutput("head")),
+                   tableOutput("head"),
+                   generalViewPlotUI("GV"),
+                   ),
           tabPanel("General View",
                    plotOutput("content")),
-          tabPanel("Discovery", plotOutput("partPlot")),
-          tabPanel("Barplot", plotOutput("barPlot")),
+          tabPanel("Discovery", plotOutput("partPlot", height = "600px")),
+          tabPanel("Barplot", plotOutput("barPlot", height = "600px")),
           type = "tabs"
         )
       )

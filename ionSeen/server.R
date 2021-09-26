@@ -9,6 +9,8 @@ library(reshape2)
 library(agricolae)
 options(stringsAsFactors = FALSE)
 
+
+
 # some useful functions
 ## 将读取文件的过程分离出来
 load_file <- function(name, path){
@@ -30,6 +32,13 @@ shinyServer(function(input, output, session){
     updateTabsetPanel(session, "tabsetSide",
                       selected = input$tabsetMain)
   })
+  
+  # 定义一些ggplot绘图参数
+  leg <- theme(title=element_text(size=15), 
+               axis.text.x=element_text(size=14),
+               axis.text.y=element_text(size=14),
+               legend.text=element_text(size=14))
+  
   # 上传文件并读取数据
   getIonInput <- reactive({
     # First. read data and sampleTable in
@@ -51,7 +60,6 @@ shinyServer(function(input, output, session){
     rownames(icp_matrix) <- icpppm[,1]
     icp_matrix
   })
-  
   output$content <- renderPlot({
     icpppm <- getIonInput()
     icp_matrix <- getIonMatrix()
@@ -69,10 +77,6 @@ shinyServer(function(input, output, session){
       # 生成分组信息
       pca_result <-as.data.frame(pca$x)
       pca_result$genotype_group_factor <- factor(icpppm[,1])
-      leg <- theme(title=element_text(size=15), 
-                   axis.text.x=element_text(size=14),
-                   axis.text.y=element_text(size=14),
-                   legend.text=element_text(size=14))
       summ<-summary(pca)
       p <- ggplot(pca_result, aes(x=PC1,y=PC2, color = genotype_group_factor)) +
         geom_point(size=2) +
@@ -81,7 +85,7 @@ shinyServer(function(input, output, session){
         theme_minimal() +
         xlab(paste0("PC1(",round(summ$importance[2,1]*100,2),"%)")) +
         ylab(paste0("PC2(",round(summ$importance[2,2]*100,2),"%)")) +
-        leg
+        leg + coord_fixed()
     }
     # 返回给ui
     p
@@ -97,11 +101,12 @@ shinyServer(function(input, output, session){
     ionList <- colnames(icpppm)[-1]
     checkboxGroupInput("element", "Choose the element:",selected = ionList[1], as.list(ionList))
   })
-  # adapt for reset
+  # adapt for reset ION1
   observeEvent(input$resetION1,{
-    updateCheckboxGroupInput(inputId = "element", value = ionList[1])
+    icpppm <- getIonInput()
+    ionList <- colnames(icpppm)[-1]
+    updateCheckboxGroupInput(inputId = "element", selected = ionList[1])
   })
-  
   # choose sample ID to analysis
   output$idSelector <- renderUI({
     icpppm <- getIonInput()
@@ -110,14 +115,19 @@ shinyServer(function(input, output, session){
                        selected = idList[1],
                        as.list(idList))
   })
-  
+  # adapt for reset ID1
+  observeEvent(input$resetID1,{
+    icpppm <- getIonInput()
+    idList <- unique(icpppm[,1])
+    updateCheckboxGroupInput(inputId = "ID", selected = idList[1])
+  })
   # create selection ui for single ion
   output$singleElementSelector <- renderUI({
     icpppm <- getIonInput()
     ionList <- colnames(icpppm)[-1]
     selectInput("elementSingle", "Choose the element:",selected = ionList[1], as.list(ionList))
   })
-  
+
   # choose sample ID to analysis 2
   output$idSelector2 <- renderUI({
     icpppm <- getIonInput()
@@ -126,7 +136,12 @@ shinyServer(function(input, output, session){
                        selected = idList[1],
                        as.list(idList))
   })
-  
+  # adapt for reset ID2
+  observeEvent(input$resetID2,{
+    icpppm <- getIonInput()
+    idList <- unique(icpppm[,1])
+    updateCheckboxGroupInput(inputId = "ID2", selected = idList[1])
+  })
   ## Part analysis ####
   # 分析选中的元素与材料
   # 创建函数用于去除异常值
@@ -163,11 +178,18 @@ shinyServer(function(input, output, session){
                         id.vars = "ID", 
                         variable.name = "element",
                         value.name = "content") %>% na.omit()
-    p <- icpppm_melt %>%
+    df_to_plot <- icpppm_melt %>%
       filter(ID %in% choosed_ID) %>%
-      filter(element %in% choosed_element) %>%
+      filter(element %in% choosed_element)
+    coord_ratio <- 1
+    if(nrow(df_to_plot) > 0){
+      coord_ratio <- length(choosed_ID) / (max(df_to_plot$content) - min(df_to_plot$content)) / length(choosed_element)
+    }
+    p <- df_to_plot %>%
       ggplot(aes(x = element, y = content, fill = ID)) +
-      geom_boxplot() 
+      geom_boxplot() +
+      # coord_fixed(ratio = coord_ratio) +
+      leg
     
     # return plot
     p
@@ -197,14 +219,17 @@ shinyServer(function(input, output, session){
     # 如果ID长度等于1，随便画画
     if((length(choosed_ID) == 1)&(length(choosed_element) == 1)) {
       # plot bar 
-      p <- icpppm_summarise %>%
+      df_to_plot <- icpppm_summarise %>%
         filter(element == choosed_element) %>%
-        filter(ID %in% choosed_ID) %>%
+        filter(ID %in% choosed_ID) 
+      coord_ratio <- length(unique(df_to_plot$ID)) / mean(df_to_plot$mean_content)
+      p <- df_to_plot %>% 
         ggplot(aes(x = ID, y = mean_content)) + 
         geom_bar(position = position_dodge(0.7), stat = "identity", width = 0.5)+
         geom_errorbar(aes(x=ID, ymin=mean_content-se, ymax=mean_content+se), width=0.2, colour="black", alpha=0.7, size=1) +
         theme_minimal() +
-        theme(text = element_text(size = 20))
+        #coord_fixed(ratio = coord_ratio) +
+        leg
     }
     
     # 如果ID length 等于2，进行welch t.test
@@ -220,13 +245,18 @@ shinyServer(function(input, output, session){
       
       # 添加ttest结果的标注
       ttest_text <- paste0("t.test p value = ", round(ttest.res$p.value, 4))
+      coord_ratio <- 1
+      if(nrow(ttest_summarise) > 0){
+        coord_ratio <- length(unique(ttest_summarise$ID)) / mean(ttest_summarise$mean_content)
+      }
       p <- ttest_summarise %>%
         ggplot(aes(x = ID, y = mean_content)) + 
         geom_bar(position = position_dodge(0.7), stat = "identity", width = 0.5)+
         geom_errorbar(aes(x=ID, ymin=mean_content-se, ymax=mean_content+se), width=0.2, colour="black", alpha=0.7, size=1) +
         theme_minimal() +
-        theme(text = element_text(size = 20))+
-        xlab(ttest_text)
+        xlab(ttest_text) +
+        #coord_fixed(ratio = coord_ratio) +
+        leg 
     }
     # 如果ID数量达到3才进行ANOVA
     if((length(choosed_ID) >= 3)&(length(choosed_element) == 1)) {
@@ -245,20 +275,27 @@ shinyServer(function(input, output, session){
         filter(element %in% choosed_element) %>%
         filter(ID %in% choosed_ID)
       AOV_summarise$marker <- LSD.marker[as.character(AOV_summarise$ID),2]
-      
+      coord_ratio <- 1
+      if(nrow(AOV_summarise) > 0 ){
+        coord_ratio <- length(unique(AOV_summarise$ID)) / mean(AOV_summarise$mean_content)
+        }
       # plot
       if(anova.res[1,5] < 0.05){AOV_text <- "ANOVA test significant"}
       if(anova.res[1,5] >= 0.05){AOV_text <- "ANOVA test insignificant"}
+      
       p <- AOV_summarise %>%
         ggplot(aes(x = ID, y = mean_content)) + 
         geom_bar(position = position_dodge(0.7), stat = "identity", width = 0.5)+
         geom_errorbar(aes(x=ID, ymin=mean_content-se, ymax=mean_content+se), width=0.2, colour="black", alpha=0.7, size=1) +
         geom_text(aes(x = ID, y = mean_content+se*2, label = marker), size = 8)+
         theme_minimal() +
-        theme(text = element_text(size = 20)) +
-        xlab(AOV_text)
+        xlab(AOV_text) +
+        #coord_fixed(ratio = coord_ratio) +
+        leg
     }
     p
   })
-  
+  #generalViewServer("GV", getIonInput = getIonInput, getIonMatrix = getIonMatrix)
+  #generalViewServerDemo("GV", passed = "Try")
+  #inputDataPanelServer("dataIn")
 })
