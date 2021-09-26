@@ -1,15 +1,5 @@
 library(shiny)
 
-# some useful functions 
-## 选择是否去除异常值
-checkboxInput.outRemover <- function(){
-  checkboxInput("outRemover", div("Remove Outlier", style = "font-weight: bold;"),value = FALSE)
-}
-## 选择去除异常值系数
-sliderInput.outCoef <- function(){
-  sliderInput("outCoef", "Outlier Coef", value = 5, min = 3, max = 8)
-}
-
 ## main UI ####
 shinyUI(
   fluidPage(
@@ -45,8 +35,8 @@ shinyUI(
                    # 添加重置ID按钮1
                    actionButton("resetID1", "Reset"),
                    # 选择是否去除异常值，默认不去除
-                   checkboxInput.outRemover(),
-                   sliderInput.outCoef(),
+                   checkboxInput.outRemover("outRemover"),
+                   sliderInput.outCoef("outCoef"),
           ),
           ## 侧边栏第三页 ####
           ## 选择单个元素画柱状图
@@ -57,10 +47,10 @@ shinyUI(
                    # 选择样本
                    uiOutput("idSelector2"),
                    # 添加重置ID按钮2
-                   actionButton("resetID2", "Reset"),
+                   actionButton("resetID1", "Reset"),
                    # 选择是否去除异常值，默认不去除
-                   checkboxInput.outRemover(),
-                   sliderInput.outCoef(),
+                   checkboxInput.outRemover("outRemover2"),
+                   sliderInput.outCoef("outCoef2"),
           ),
           type = "tabs"
         ),

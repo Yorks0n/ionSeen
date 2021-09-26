@@ -10,17 +10,6 @@ library(agricolae)
 options(stringsAsFactors = FALSE)
 
 
-
-# some useful functions
-## 将读取文件的过程分离出来
-load_file <- function(name, path){
-  ext <- tools::file_ext(name)
-  switch(ext,
-         csv = read.csv(path, sep = ","),
-         tsv = read.csv(path, sep = "\t"),
-         validate("Invalid file; Please upload a .csv or .tsv file"))
-}
-
 ## main server ####
 shinyServer(function(input, output, session){
   # 根据Panel选择自动切换页面
@@ -205,8 +194,8 @@ shinyServer(function(input, output, session){
     choosed_ID <- input$ID2
     
     icpppm_out_removed <- outliner_remover(icpppm, 
-                                           remove_outliner = input$outRemover, 
-                                           outliner_coef = input$outCoef, 
+                                           remove_outliner = input$outRemover2, 
+                                           outliner_coef = input$outCoef2, 
                                            scale = FALSE)
     icpppm_melt <- melt(icpppm_out_removed, 
                         id.vars = "ID", 
